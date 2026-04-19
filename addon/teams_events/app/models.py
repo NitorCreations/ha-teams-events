@@ -29,6 +29,8 @@ class AppConfig:
     subscription_lifetime_minutes: int
     renewal_headroom_minutes: int
     subscription_state_path: str
+    notification_cert_path: str
+    notification_key_path: str
     trigger_modes: bool
     log_level: str
     rooms: tuple[RoomConfig, ...]

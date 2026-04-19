@@ -9,6 +9,7 @@ from pathlib import Path
 import aiohttp
 
 from .calendar_watcher import CalendarWatcher
+from .cert_store import load_or_generate
 from .config import load_config
 from .event_router import EventRouter
 from .graph_client import GraphClient
@@ -40,6 +41,11 @@ async def _amain() -> None:
         state_path.parent.mkdir(parents=True, exist_ok=True)
     store = SubscriptionStore(persist_path=state_path)
 
+    cert = load_or_generate(
+        Path(config.notification_cert_path), Path(config.notification_key_path)
+    )
+    log.info("Notification cert id (SHA-256 thumbprint): %s", cert.cert_id)
+
     async with AsyncExitStack() as stack:
         session = await stack.enter_async_context(aiohttp.ClientSession())
         ha = HAClient(config.ha_base_url, config.ha_token, session)
@@ -51,6 +57,7 @@ async def _amain() -> None:
             ha=ha,
             health=health,
             dedupe_window_seconds=config.dedupe_window_seconds,
+            cert=cert,
             trigger_modes=config.trigger_modes,
         )
         relay = RelayWSClient(
@@ -72,6 +79,7 @@ async def _amain() -> None:
                 store=store,
                 health=health,
                 notification_url=config.graph_webhook_url,
+                cert=cert,
                 subscription_lifetime_minutes=config.subscription_lifetime_minutes,
                 renewal_headroom_minutes=config.renewal_headroom_minutes,
             )

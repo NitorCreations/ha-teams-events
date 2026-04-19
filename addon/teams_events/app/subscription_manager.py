@@ -5,9 +5,11 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import quote
 
 from dateutil import parser as dtparse
 
+from .cert_store import NotificationCert
 from .graph_client import GraphAuthError, GraphClient
 from .health import Health
 from .models import MeetingWatch, RoomConfig, SubscriptionRecord
@@ -17,20 +19,15 @@ log = logging.getLogger(__name__)
 
 
 class SubscriptionManager:
-    """Manages the Microsoft Graph change-notification subscriptions that
-    correspond to the currently watched meeting in each room.
+    """Manages Graph change-notification subscriptions on Teams online meetings.
 
-    - `on_meeting_change` is called by the CalendarWatcher when a room's
-      active/imminent meeting appears, changes, or clears. The manager creates,
-      replaces, or deletes the subscription as needed.
-    - `run_renewal_loop` keeps subscriptions alive by PATCHing a new expiration
-      before the current one runs out.
-    - `cleanup_all` is best-effort teardown on shutdown.
+    For each watched meeting we subscribe to the `meetingCallEvents` resource
+    keyed by the meeting's `joinWebUrl` — no meeting-id resolution step
+    required. Rich notifications with encrypted resource data are enabled so
+    we get participant/delta information directly in the notification.
 
-    The Graph resource used for subscriptions is of the form
-    `/communications/onlineMeetings/{meeting_id}`. The meeting id is resolved
-    from the calendar event's `joinWebUrl` because that is what Teams gives us;
-    the event id is different.
+    Reference:
+      https://learn.microsoft.com/graph/changenotifications-for-onlinemeeting
     """
 
     def __init__(
@@ -39,6 +36,7 @@ class SubscriptionManager:
         store: SubscriptionStore,
         health: Health,
         notification_url: str,
+        cert: NotificationCert,
         change_type: str = "updated",
         subscription_lifetime_minutes: int = 55,
         renewal_headroom_minutes: int = 15,
@@ -48,6 +46,7 @@ class SubscriptionManager:
         self._store = store
         self._health = health
         self._notification_url = notification_url
+        self._cert = cert
         self._change_type = change_type
         self._lifetime = timedelta(minutes=subscription_lifetime_minutes)
         self._renewal_headroom = timedelta(minutes=renewal_headroom_minutes)
@@ -103,8 +102,6 @@ class SubscriptionManager:
                         record.subscription_id,
                         exc,
                     )
-                    # Drop the broken record and let the next calendar poll
-                    # create a fresh subscription if the meeting is still active.
                     self._store.remove(record.subscription_id)
 
     # --- shutdown --------------------------------------------------------
@@ -129,15 +126,18 @@ class SubscriptionManager:
         )
 
     async def _create(self, meeting: MeetingWatch) -> SubscriptionRecord:
-        meeting_id = await self._resolve_meeting_id(meeting)
+        resource = _meeting_call_events_resource(meeting.join_web_url)
         expires = datetime.now(timezone.utc) + self._lifetime
         client_state = secrets.token_urlsafe(32)
         body = {
             "changeType": self._change_type,
             "notificationUrl": self._notification_url,
-            "resource": f"/communications/onlineMeetings/{meeting_id}",
+            "resource": resource,
             "expirationDateTime": _graph_timestamp(expires),
             "clientState": client_state,
+            "includeResourceData": True,
+            "encryptionCertificate": self._cert.public_cert_b64_der,
+            "encryptionCertificateId": self._cert.cert_id,
         }
         payload = await self._graph.post("/subscriptions", body)
         subscription_id = payload["id"]
@@ -196,23 +196,6 @@ class SubscriptionManager:
         self._store.remove(record.subscription_id)
         self._update_health()
 
-    async def _resolve_meeting_id(self, meeting: MeetingWatch) -> str:
-        """Resolve the Graph onlineMeeting id from the joinWebUrl.
-
-        The calendar event's `id` is the event id, not the online meeting id.
-        Graph requires the online meeting id for subscription resources, which
-        is looked up by filtering on `JoinWebUrl`.
-        """
-        filter_expr = f"JoinWebUrl eq '{meeting.join_web_url}'"
-        path = f"/users/{meeting.room.account_email}/onlineMeetings"
-        payload = await self._graph.get(path, params={"$filter": filter_expr})
-        values = payload.get("value") or []
-        if not values:
-            raise GraphAuthError(
-                f"No onlineMeeting for joinWebUrl={meeting.join_web_url!r}"
-            )
-        return values[0]["id"]
-
     def _update_health(self) -> None:
         self._health.update(
             active_subscriptions=self._store.size(),
@@ -224,6 +207,21 @@ class SubscriptionManager:
         )
 
 
+def _meeting_call_events_resource(join_web_url: str) -> str:
+    """Build the Graph subscription `resource` string for Teams meeting call
+    events.
+
+    The `joinWebUrl` that Teams embeds in calendar events is already
+    URL-encoded (contains `%3a`, `%40`, `%7b`, …). Graph requires the value to
+    appear *double* URL-encoded inside the OData function call, so we apply
+    `quote` once more here. See:
+      https://learn.microsoft.com/graph/changenotifications-for-onlinemeeting
+    """
+    double_encoded = quote(join_web_url, safe="")
+    return f"communications/onlineMeetings(joinWebUrl='{double_encoded}')/meetingCallEvents"
+
+
 def _graph_timestamp(when: datetime) -> str:
-    """Graph expects ISO-8601 with a `Z` suffix."""
-    return when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{when.microsecond // 1000:03d}Z"
+    return when.astimezone(timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%S."
+    ) + f"{when.microsecond // 1000:03d}Z"

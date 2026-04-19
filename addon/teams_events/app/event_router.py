@@ -5,8 +5,10 @@ import logging
 import time
 from typing import Any
 
+from .cert_store import NotificationCert
 from .ha_client import HAClient
 from .health import Health
+from .notification_decrypt import DecryptionError, decrypt_encrypted_content
 from .subscription_store import SubscriptionStore
 
 log = logging.getLogger(__name__)
@@ -16,8 +18,15 @@ class EventRouter:
     """Routes Graph notifications (forwarded by the relay) to room_modes.run_mode.
 
     For each notification we look up the stored subscription, verify the
-    `clientState` matches the secret we set at creation time, dedupe within a
-    short window, and trigger the room mode.
+    `clientState` matches the secret we set at creation time, optionally
+    decrypt the resource data, dedupe within a short window, and trigger the
+    room mode.
+
+    We currently treat any notification targeting a known subscription as a
+    trigger signal. The subscription was created for exactly one meeting and
+    the dedupe window suppresses burst notifications, so this works for the
+    "Jabra joins the call" signal without having to inspect participant lists.
+    The decrypted payload is still logged at INFO for observability.
     """
 
     def __init__(
@@ -26,12 +35,14 @@ class EventRouter:
         ha: HAClient,
         health: Health,
         dedupe_window_seconds: int,
+        cert: NotificationCert,
         trigger_modes: bool = True,
     ) -> None:
         self._store = store
         self._ha = ha
         self._health = health
         self._dedupe_window = dedupe_window_seconds
+        self._cert = cert
         self._trigger_modes = trigger_modes
         self._last_fire: dict[str, float] = {}
         self._lock = asyncio.Lock()
@@ -63,6 +74,22 @@ class EventRouter:
             return
         self._health.update(last_forwarded_event_at=time.time())
 
+        encrypted = notification.get("encryptedContent")
+        if encrypted:
+            try:
+                decrypted = decrypt_encrypted_content(encrypted, self._cert)
+                log.info(
+                    "Decrypted meeting-call event for room %s: %s",
+                    record.room.room_id,
+                    _summarise(decrypted),
+                )
+            except DecryptionError as exc:
+                log.warning(
+                    "Failed to decrypt notification for subscription %s: %s",
+                    subscription_id,
+                    exc,
+                )
+
         async with self._lock:
             last = self._last_fire.get(record.room.room_id, 0.0)
             now = time.time()
@@ -91,3 +118,21 @@ class EventRouter:
             )
         except Exception as exc:  # pragma: no cover
             log.exception("run_room_mode failed: %s", exc)
+
+
+def _summarise(payload: dict[str, Any]) -> str:
+    """Single-line summary of a decrypted meetingCallEvents payload for logs."""
+    keys = [
+        k
+        for k in (
+            "callStartDateTime",
+            "callEndDateTime",
+            "eventDateTime",
+            "eventType",
+            "participantId",
+        )
+        if k in payload
+    ]
+    if keys:
+        return ", ".join(f"{k}={payload[k]}" for k in keys)
+    return ",".join(sorted(payload.keys()))[:200]

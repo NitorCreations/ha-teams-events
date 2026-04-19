@@ -28,7 +28,9 @@ Then **Grant admin consent for \<tenant\>**. The status should flip to "Granted 
 
 ### 4. Allow the app to access online meetings (Teams policy)
 
-Calling `/users/{email}/onlineMeetings` and subscribing to meeting-change notifications requires the tenant to authorize the app against specific user mailboxes via a Teams **Application Access Policy**. A Teams admin runs this once in PowerShell (MicrosoftTeams module):
+Subscribing to a Teams meeting's change notifications requires the tenant to authorize the app against the **meeting organizer's** identity via a Teams **Application Access Policy**. Room mailboxes are typically invitees, not organizers, so granting per-room does nothing — you must grant against organizers (or grant globally). For an office-automation add-on where any staff member can book a room and expect the room mode to activate, a tenant-wide grant is the pragmatic choice.
+
+A Teams admin runs this once in PowerShell (MicrosoftTeams module):
 
 ```powershell
 Connect-MicrosoftTeams
@@ -37,22 +39,25 @@ Connect-MicrosoftTeams
 New-CsApplicationAccessPolicy `
   -Identity "ha-teams-events-policy" `
   -AppIds "<application-client-id>" `
-  -Description "ha-teams-events add-on: access to room mailbox online meetings"
+  -Description "ha-teams-events add-on: access to Teams meeting call events"
 
-# 2. Grant the policy to the specific room accounts.
-Grant-CsApplicationAccessPolicy `
-  -PolicyName "ha-teams-events-policy" `
-  -Identity "room-kohonen@nitor.com"
-
-Grant-CsApplicationAccessPolicy `
-  -PolicyName "ha-teams-events-policy" `
-  -Identity "room-lovelace@nitor.com"
+# 2. Grant the policy tenant-wide.
+Grant-CsApplicationAccessPolicy -PolicyName "ha-teams-events-policy" -Global
 ```
 
-Grants can take ~30 minutes to propagate. To verify:
+Grants can take up to ~30 minutes to propagate. To verify at any point, probe the Graph subscription API directly via curl (see §5 below — if a valid JoinWebUrl lookup returns 200, propagation is done).
 
-```powershell
-Get-CsUserPolicyAssignment -Identity "room-kohonen@nitor.com" -PolicyType ApplicationAccessPolicy
+**Headless admin session (Linux):** if you want to run these commands without an interactive `Connect-MicrosoftTeams` browser flow, and you're already signed in to `az` with Teams Administrator PIM-activated, you can inject your az-issued tokens:
+
+```bash
+TEAMS_TOKEN=$(az account get-access-token --resource 48ac35b8-9aa8-4d74-927d-1f4a14a0b239 --query accessToken -o tsv)
+GRAPH_TOKEN=$(az account get-access-token --resource https://graph.microsoft.com --query accessToken -o tsv)
+export TEAMS_TOKEN GRAPH_TOKEN
+pwsh -NoProfile -Command '
+Connect-MicrosoftTeams -AccessTokens @($env:GRAPH_TOKEN, $env:TEAMS_TOKEN) | Out-Null
+# ...run New- / Grant- cmdlets here...
+Disconnect-MicrosoftTeams | Out-Null
+'
 ```
 
 ### 5. Verification (token + calendar read)
@@ -90,14 +95,9 @@ curl -sS -G "https://graph.microsoft.com/v1.0/users/room-kohonen@nitor.com/calen
 
 If this returns `{"value": [...]}` (even empty), Step 3 + admin consent are working.
 
-For the online-meetings endpoint (Step 4 dependency):
+Sanity-check the subscription resource the add-on actually uses. Take a JoinWebUrl from a real Teams meeting on one of your room calendars (obtained from `onlineMeeting.joinUrl` in the calendarView response) and try a subscription dry-run — the API call the add-on's `SubscriptionManager._create` makes. If it succeeds, the whole path is authorized and the policy has propagated.
 
-```bash
-curl -sS "https://graph.microsoft.com/v1.0/users/room-kohonen@nitor.com/onlineMeetings?\$filter=JoinWebUrl%20eq%20'https://teams.microsoft.com/l/meetup-join/...'" \
-  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
-```
-
-Expect HTTP 200 + possibly empty `value`. A `403` here means the Application Access Policy in Step 4 hasn't been granted (or hasn't propagated yet).
+Note the add-on looks meetings up via the organizer context, not the room. A 404 on the OData `$filter=JoinWebUrl eq` lookup against `/users/<room>/onlineMeetings` is not a failure signal — rooms are invitees, not organizers, so that filter will always 404 for room mailboxes.
 
 ### 6. Plug values into the add-on
 

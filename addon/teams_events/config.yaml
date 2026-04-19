@@ -1,5 +1,5 @@
 name: Teams Events
-version: "0.1.2"
+version: "0.2.0"
 slug: teams_events
 description: Trigger Home Assistant room modes from Microsoft Teams meeting events
 url: https://github.com/NitorCreations/ha-teams-events
@@ -26,6 +26,8 @@ options:
   subscription_lifetime_minutes: 55
   renewal_headroom_minutes: 15
   subscription_state_path: "/data/subscriptions.json"
+  notification_cert_path: "/data/notification_cert.pem"
+  notification_key_path: "/data/notification_key.pem"
   trigger_modes: true
   log_level: "INFO"
   rooms:
@@ -50,6 +52,8 @@ schema:
   subscription_lifetime_minutes: int(5,4230)
   renewal_headroom_minutes: int(1,240)
   subscription_state_path: str
+  notification_cert_path: str
+  notification_key_path: str
   trigger_modes: bool
   log_level: list(DEBUG|INFO|WARNING|ERROR)
   rooms:
