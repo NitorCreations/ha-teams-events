@@ -37,14 +37,12 @@ AWS_PROFILE=nitor-infra cdk deploy
 
 ## Releasing the add-on image
 
-Images are published to GHCR as `ghcr.io/nitorcreations/{arch}-teams-events:{version}` for `amd64` and `aarch64`. The add-on's `config.yaml` points to `ghcr.io/nitorcreations/{arch}-teams-events` and HA Supervisor substitutes `{arch}` at install time.
+Images are published to Docker Hub as `docker.io/nitor/ha-teams-events:{version}` as a single multi-arch manifest (linux/amd64 + linux/arm64). The add-on `config.yaml` points to `docker.io/nitor/ha-teams-events` and Docker picks the correct arch on pull. Matches the `ha-nitor-backend` convention — needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repo secrets (the same ones `ha-nitor-backend` uses).
 
 The release workflow runs when a GitHub release is **published** and requires the release tag to match the version in `addon/teams_events/config.yaml` (tag `v0.2.0` ↔ `version: "0.2.0"`).
 
 To cut a release:
 
 1. Bump `version:` in `addon/teams_events/config.yaml` and commit.
-2. Push the commit to `main`.
-3. Create a GitHub release with tag `v<version>` (matches the bumped version). The workflow will build and push both architectures.
-
-The first release must also make the two GHCR packages public in repo settings so HA instances can pull them without a registry login.
+2. Push to `main`.
+3. Create a GitHub release with tag `v<version>`. The workflow builds both architectures in one buildx run and pushes `:<version>` and `:latest` (for non-prereleases).

@@ -40,5 +40,3 @@ jobs:
           file: ${{ env.CONTEXT_DIR }}/Dockerfile
           platforms: linux/amd64
           push: false
-          build-args: |
-            BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.19
