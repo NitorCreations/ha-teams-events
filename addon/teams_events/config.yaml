@@ -16,11 +16,16 @@ options:
   client_secret: ""
   relay_ws_url: "wss://relay.example.com/ws"
   relay_token: ""
+  graph_webhook_url: "https://relay.example.com/graph/webhook"
   site_id: "office-ha"
   ha_base_url: "http://supervisor/core"
   poll_interval_seconds: 30
   meeting_lookahead_minutes: 15
   dedupe_window_seconds: 20
+  subscription_lifetime_minutes: 55
+  renewal_headroom_minutes: 15
+  subscription_state_path: "/data/subscriptions.json"
+  trigger_modes: true
   log_level: "INFO"
   rooms:
     - room_id: "kohonen"
@@ -35,11 +40,16 @@ schema:
   client_secret: password
   relay_ws_url: url
   relay_token: password
+  graph_webhook_url: url
   site_id: str
   ha_base_url: str
   poll_interval_seconds: int(5,3600)
   meeting_lookahead_minutes: int(1,240)
   dedupe_window_seconds: int(1,600)
+  subscription_lifetime_minutes: int(5,4230)
+  renewal_headroom_minutes: int(1,240)
+  subscription_state_path: str
+  trigger_modes: bool
   log_level: list(DEBUG|INFO|WARNING|ERROR)
   rooms:
     - room_id: str

@@ -19,12 +19,17 @@ class AppConfig:
     client_secret: str
     relay_ws_url: str
     relay_token: str
+    graph_webhook_url: str
     site_id: str
     ha_base_url: str
     ha_token: str
     poll_interval_seconds: int
     meeting_lookahead_minutes: int
     dedupe_window_seconds: int
+    subscription_lifetime_minutes: int
+    renewal_headroom_minutes: int
+    subscription_state_path: str
+    trigger_modes: bool
     log_level: str
     rooms: tuple[RoomConfig, ...]
 

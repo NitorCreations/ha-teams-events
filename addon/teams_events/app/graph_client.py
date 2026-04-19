@@ -79,3 +79,20 @@ class GraphClient:
             if resp.status >= 400:
                 raise GraphAuthError(f"POST {path} failed ({resp.status}): {payload}")
             return payload
+
+    async def patch(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
+        headers = {**await self._auth_header(), "Content-Type": "application/json"}
+        url = f"{GRAPH_BASE}{path}"
+        async with self._session.patch(url, headers=headers, json=body) as resp:
+            payload = await resp.json() if resp.content_length else {}
+            if resp.status >= 400:
+                raise GraphAuthError(f"PATCH {path} failed ({resp.status}): {payload}")
+            return payload
+
+    async def delete(self, path: str) -> None:
+        headers = await self._auth_header()
+        url = f"{GRAPH_BASE}{path}"
+        async with self._session.delete(url, headers=headers) as resp:
+            if resp.status >= 400 and resp.status != 404:
+                text = await resp.text()
+                raise GraphAuthError(f"DELETE {path} failed ({resp.status}): {text}")

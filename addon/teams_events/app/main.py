@@ -4,6 +4,7 @@ import asyncio
 import logging
 import signal
 from contextlib import AsyncExitStack
+from pathlib import Path
 
 import aiohttp
 
@@ -13,8 +14,8 @@ from .event_router import EventRouter
 from .graph_client import GraphClient
 from .ha_client import HAClient
 from .health import Health
-from .models import MeetingWatch, RoomConfig
 from .relay_ws_client import RelayWSClient
+from .subscription_manager import SubscriptionManager
 from .subscription_store import SubscriptionStore
 
 log = logging.getLogger("teams_events")
@@ -33,7 +34,11 @@ async def _amain() -> None:
     log.info("Starting teams-events add-on (site=%s rooms=%d)", config.site_id, len(config.rooms))
 
     health = Health()
-    store = SubscriptionStore()
+
+    state_path = Path(config.subscription_state_path) if config.subscription_state_path else None
+    if state_path is not None:
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+    store = SubscriptionStore(persist_path=state_path)
 
     async with AsyncExitStack() as stack:
         session = await stack.enter_async_context(aiohttp.ClientSession())
@@ -46,7 +51,7 @@ async def _amain() -> None:
             ha=ha,
             health=health,
             dedupe_window_seconds=config.dedupe_window_seconds,
-            trigger_modes=False,
+            trigger_modes=config.trigger_modes,
         )
         relay = RelayWSClient(
             url=config.relay_ws_url,
@@ -56,19 +61,38 @@ async def _amain() -> None:
             health=health,
         )
 
-        def on_meeting_change(meeting: MeetingWatch | None, room: RoomConfig) -> None:
-            # Subscription management lands in Phase 3; for now we only log.
+        graph_credentials_ok = bool(
+            config.tenant_id and config.client_id and config.client_secret
+        )
+
+        subscription_manager: SubscriptionManager | None = None
+        if graph_credentials_ok and config.graph_webhook_url:
+            subscription_manager = SubscriptionManager(
+                graph=graph,
+                store=store,
+                health=health,
+                notification_url=config.graph_webhook_url,
+                subscription_lifetime_minutes=config.subscription_lifetime_minutes,
+                renewal_headroom_minutes=config.renewal_headroom_minutes,
+            )
+        elif graph_credentials_ok:
+            log.warning(
+                "graph_webhook_url is empty; subscription manager disabled"
+            )
+
+        async def on_meeting_change(meeting, room):
             if meeting is None:
                 log.info("Room %s has no active/imminent meeting", room.room_id)
             else:
                 log.info(
-                    "Room %s: meeting %s (%s → %s) joinUrl=%s",
+                    "Room %s: meeting %s (%s → %s)",
                     room.room_id,
                     meeting.meeting_id,
                     meeting.start.isoformat(),
                     meeting.end.isoformat(),
-                    meeting.join_web_url,
                 )
+            if subscription_manager is not None:
+                await subscription_manager.on_meeting_change(meeting, room)
 
         watcher = CalendarWatcher(
             graph=graph,
@@ -79,13 +103,17 @@ async def _amain() -> None:
             health=health,
         )
 
-        tasks = [
-            asyncio.create_task(relay.run(), name="relay-ws"),
-        ]
-        if config.tenant_id and config.client_id and config.client_secret:
+        tasks = [asyncio.create_task(relay.run(), name="relay-ws")]
+        if graph_credentials_ok:
             tasks.append(asyncio.create_task(watcher.run(), name="calendar-watcher"))
         else:
             log.warning("Graph credentials not configured; calendar watcher disabled")
+        if subscription_manager is not None:
+            tasks.append(
+                asyncio.create_task(
+                    subscription_manager.run_renewal_loop(), name="subscription-renewer"
+                )
+            )
 
         loop = asyncio.get_running_loop()
         stop = loop.create_future()
@@ -102,6 +130,14 @@ async def _amain() -> None:
                 await task
             except asyncio.CancelledError:
                 pass
+
+        if subscription_manager is not None:
+            log.info("Cleaning up %d subscription(s)", store.size())
+            try:
+                await asyncio.wait_for(subscription_manager.cleanup_all(), timeout=10)
+            except asyncio.TimeoutError:
+                log.warning("Subscription cleanup timed out")
+
         log.info("Shutdown complete")
 
 

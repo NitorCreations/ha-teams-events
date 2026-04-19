@@ -15,9 +15,9 @@ log = logging.getLogger(__name__)
 class EventRouter:
     """Routes Graph notifications (forwarded by the relay) to room_modes.run_mode.
 
-    Currently logs the match and dedupes within a short window. The actual
-    run_mode call is guarded by `trigger_modes` so Phase 1 can run in log-only
-    mode while we verify end-to-end delivery.
+    For each notification we look up the stored subscription, verify the
+    `clientState` matches the secret we set at creation time, dedupe within a
+    short window, and trigger the room mode.
     """
 
     def __init__(
@@ -26,7 +26,7 @@ class EventRouter:
         ha: HAClient,
         health: Health,
         dedupe_window_seconds: int,
-        trigger_modes: bool = False,
+        trigger_modes: bool = True,
     ) -> None:
         self._store = store
         self._ha = ha
@@ -53,6 +53,13 @@ class EventRouter:
         record = self._store.by_subscription_id(subscription_id)
         if record is None:
             log.info("No local mapping for subscription %s; ignoring", subscription_id)
+            return
+        incoming_state = notification.get("clientState", "")
+        if record.client_state and incoming_state != record.client_state:
+            log.warning(
+                "Rejecting notification for subscription %s: clientState mismatch",
+                subscription_id,
+            )
             return
         self._health.update(last_forwarded_event_at=time.time())
 

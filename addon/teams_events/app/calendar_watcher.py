@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Callable, Iterable
+from typing import Awaitable, Callable, Iterable
 
 from dateutil import parser as dtparse
 
@@ -14,7 +14,7 @@ from .models import MeetingWatch, RoomConfig
 log = logging.getLogger(__name__)
 
 # Callback invoked when a room's active/imminent meeting changes.
-MeetingCallback = Callable[[MeetingWatch | None, RoomConfig], None]
+MeetingCallback = Callable[[MeetingWatch | None, RoomConfig], Awaitable[None]]
 
 
 class CalendarWatcher:
@@ -67,7 +67,7 @@ class CalendarWatcher:
                     room.room_id,
                     meeting.meeting_id if meeting else "<cleared>",
                 )
-                self._on_change(meeting, room)
+                await self._on_change(meeting, room)
 
     async def _find_meeting(
         self, room: RoomConfig, window_start: datetime, window_end: datetime
