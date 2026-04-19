@@ -11,6 +11,7 @@ venv/
 # CDK
 infra/cdk/cdk.out/
 infra/cdk/.cdk.staging/
+infra/cdk/cdk-outputs.json
 
 # Editor
 .vscode/
