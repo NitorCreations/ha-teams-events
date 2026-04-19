@@ -1,0 +1,47 @@
+name: Jabra Events
+version: "0.1.0"
+slug: jabra_events
+description: Trigger Home Assistant room modes from Microsoft Teams meeting events on Jabra room terminals
+url: https://github.com/NitorCreations/ha-jabra-events
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: application
+hassio_api: true
+homeassistant_api: true
+options:
+  tenant_id: ""
+  client_id: ""
+  client_secret: ""
+  relay_ws_url: "wss://relay.example.com/ws"
+  relay_token: ""
+  site_id: "office-ha"
+  ha_base_url: "http://supervisor/core"
+  poll_interval_seconds: 30
+  meeting_lookahead_minutes: 15
+  dedupe_window_seconds: 20
+  log_level: "INFO"
+  rooms:
+    - room_id: "kohonen"
+      account_email: "room-kohonen@nitor.com"
+      mode_id: "kohonen_jabra_teams"
+    - room_id: "lovelace"
+      account_email: "room-lovelace@nitor.com"
+      mode_id: "lovelace_jabra_teams"
+schema:
+  tenant_id: str
+  client_id: str
+  client_secret: password
+  relay_ws_url: url
+  relay_token: password
+  site_id: str
+  ha_base_url: str
+  poll_interval_seconds: int(5,3600)
+  meeting_lookahead_minutes: int(1,240)
+  dedupe_window_seconds: int(1,600)
+  log_level: list(DEBUG|INFO|WARNING|ERROR)
+  rooms:
+    - room_id: str
+      account_email: str
+      mode_id: str

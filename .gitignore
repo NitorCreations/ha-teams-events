@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# CDK
+infra/cdk/cdk.out/
+infra/cdk/.cdk.staging/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local dev options for the add-on
+addon/jabra_events/options.json
+addon/jabra_events/.data/
