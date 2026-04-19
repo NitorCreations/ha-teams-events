@@ -3,6 +3,7 @@ version: "0.1.0"
 slug: teams_events
 description: Trigger Home Assistant room modes from Microsoft Teams meeting events
 url: https://github.com/NitorCreations/ha-teams-events
+image: ghcr.io/nitorcreations/{arch}-teams-events
 arch:
   - amd64
   - aarch64

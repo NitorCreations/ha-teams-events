@@ -17,7 +17,7 @@ Target modes: `kohonen_jabra_teams`, `lovelace_jabra_teams` (mode ids retain the
 
 ## Status
 
-Phase 1 scaffold. Graph auth and `run_mode` calls not yet wired; add-on runs but logs forwarded events without acting on them.
+Phase 3. Calendar watcher, subscription manager (create/renew/delete), relay WS client, and `room_modes.run_mode` triggering are wired. Observability sensors in HA are still TODO.
 
 ## Development
 
@@ -34,3 +34,17 @@ pip install -r requirements.txt
 cdk synth
 AWS_PROFILE=nitor-infra cdk deploy
 ```
+
+## Releasing the add-on image
+
+Images are published to GHCR as `ghcr.io/nitorcreations/{arch}-teams-events:{version}` for `amd64` and `aarch64`. The add-on's `config.yaml` points to `ghcr.io/nitorcreations/{arch}-teams-events` and HA Supervisor substitutes `{arch}` at install time.
+
+The release workflow runs when a GitHub release is **published** and requires the release tag to match the version in `addon/teams_events/config.yaml` (tag `v0.2.0` ↔ `version: "0.2.0"`).
+
+To cut a release:
+
+1. Bump `version:` in `addon/teams_events/config.yaml` and commit.
+2. Push the commit to `main`.
+3. Create a GitHub release with tag `v<version>` (matches the bumped version). The workflow will build and push both architectures.
+
+The first release must also make the two GHCR packages public in repo settings so HA instances can pull them without a registry login.

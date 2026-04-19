@@ -1,0 +1,91 @@
+name: Release add-on image
+
+on:
+  release:
+    types:
+      - published
+
+env:
+  CONTEXT_DIR: addon/teams_events
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            build_from: ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.19
+          - arch: aarch64
+            platform: linux/arm64
+            build_from: ghcr.io/home-assistant/aarch64-base-python:3.12-alpine3.19
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve and validate release version
+        id: version
+        shell: bash
+        run: |
+          ADDON_VERSION="$(awk -F'"' '/^version:/{print $2}' "${CONTEXT_DIR}/config.yaml")"
+          if [[ -z "${ADDON_VERSION}" ]]; then
+            echo "Failed to parse add-on version from ${CONTEXT_DIR}/config.yaml"
+            exit 1
+          fi
+
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+          EXPECTED_TAG="v${ADDON_VERSION}"
+          if [[ "${RELEASE_TAG}" != "${EXPECTED_TAG}" ]]; then
+            echo "Release tag (${RELEASE_TAG}) must match add-on version (${EXPECTED_TAG})."
+            exit 1
+          fi
+
+          echo "addon_version=${ADDON_VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Compute lowercased owner
+        id: owner
+        shell: bash
+        run: |
+          echo "name=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up QEMU
+        if: matrix.arch != 'amd64'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ steps.owner.outputs.name }}/${{ matrix.arch }}-teams-events
+          tags: |
+            type=raw,value=${{ steps.version.outputs.addon_version }}
+            type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.CONTEXT_DIR }}
+          file: ${{ env.CONTEXT_DIR }}/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          provenance: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILD_FROM=${{ matrix.build_from }}
