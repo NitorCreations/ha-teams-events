@@ -6,13 +6,15 @@ FROM base_${TARGETARCH}
 
 ENV LANG=C.UTF-8 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/opt/teams_events
 
 RUN apk add --no-cache python3 py3-pip
 
-WORKDIR /app
-COPY app/ /app/
-RUN pip install --no-cache-dir --break-system-packages -e .
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --break-system-packages -r /tmp/requirements.txt
+
+COPY app /opt/teams_events/app
 
 COPY run.sh /run.sh
 RUN chmod +x /run.sh

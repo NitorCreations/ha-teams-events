@@ -25,8 +25,8 @@ Phase 3. Calendar watcher, subscription manager (create/renew/delete), relay WS 
 # Addon (local dev)
 cd addon/teams_events
 python -m venv .venv && source .venv/bin/activate
-pip install -e ./app
-python -m app.main   # reads /data/options.json or ./options.json
+pip install -r requirements.txt
+PYTHONPATH=. python -m app.main   # reads /data/options.json or ./options.json
 
 # CDK
 cd infra/cdk
