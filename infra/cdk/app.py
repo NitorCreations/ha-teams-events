@@ -16,9 +16,9 @@ env = cdk.Environment(
 
 RelayStack(
     app,
-    "JabraEventsRelay",
+    "TeamsEventsRelay",
     env=env,
-    description="Jabra events relay: Graph webhook -> WebSocket forwarding",
+    description="Teams events relay: Graph webhook -> WebSocket forwarding",
 )
 
 app.synth()

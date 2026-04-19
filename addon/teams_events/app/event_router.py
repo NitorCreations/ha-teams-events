@@ -69,7 +69,7 @@ class EventRouter:
             self._last_fire[record.room.room_id] = now
 
         log.info(
-            "Jabra event matched: room=%s mode=%s meeting=%s",
+            "Teams event matched: room=%s mode=%s meeting=%s",
             record.room.room_id,
             record.room.mode_id,
             record.meeting_id,

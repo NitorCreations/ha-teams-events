@@ -1,8 +1,8 @@
-name: Jabra Events
+name: Teams Events
 version: "0.1.0"
-slug: jabra_events
-description: Trigger Home Assistant room modes from Microsoft Teams meeting events on Jabra room terminals
-url: https://github.com/NitorCreations/ha-jabra-events
+slug: teams_events
+description: Trigger Home Assistant room modes from Microsoft Teams meeting events
+url: https://github.com/NitorCreations/ha-teams-events
 arch:
   - amd64
   - aarch64

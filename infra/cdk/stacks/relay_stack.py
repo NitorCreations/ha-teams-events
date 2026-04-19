@@ -44,7 +44,7 @@ class RelayStack(Stack):
         shared_secret = secrets.Secret(
             self,
             "RelaySharedSecret",
-            description="Shared secret between the Jabra events relay and the HA add-on",
+            description="Shared secret between the Teams events relay and the HA add-on",
             generate_secret_string=secrets.SecretStringGenerator(
                 password_length=48, exclude_punctuation=True
             ),
@@ -120,7 +120,7 @@ class RelayStack(Stack):
         http_api = apigw.RestApi(
             self,
             "WebhookApi",
-            rest_api_name="jabra-events-webhook",
+            rest_api_name="teams-events-webhook",
             deploy_options=apigw.StageOptions(stage_name="prod"),
         )
         graph = http_api.root.add_resource("graph")

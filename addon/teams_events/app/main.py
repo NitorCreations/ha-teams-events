@@ -17,7 +17,7 @@ from .models import MeetingWatch, RoomConfig
 from .relay_ws_client import RelayWSClient
 from .subscription_store import SubscriptionStore
 
-log = logging.getLogger("jabra_events")
+log = logging.getLogger("teams_events")
 
 
 def _configure_logging(level: str) -> None:
@@ -30,7 +30,7 @@ def _configure_logging(level: str) -> None:
 async def _amain() -> None:
     config = load_config()
     _configure_logging(config.log_level)
-    log.info("Starting jabra-events add-on (site=%s rooms=%d)", config.site_id, len(config.rooms))
+    log.info("Starting teams-events add-on (site=%s rooms=%d)", config.site_id, len(config.rooms))
 
     health = Health()
     store = SubscriptionStore()

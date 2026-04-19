@@ -1,4 +1,4 @@
-# Jabra events relay — AWS CDK
+# Teams events relay — AWS CDK
 
 Deploys:
 
@@ -31,7 +31,7 @@ AWS_PROFILE=nitor-infra CDK_DEFAULT_REGION=eu-west-1 \
 
 ```bash
 AWS_PROFILE=nitor-infra CDK_DEFAULT_REGION=eu-west-1 \
-  npx cdk deploy JabraEventsRelay
+  npx cdk deploy TeamsEventsRelay
 ```
 
 Outputs:

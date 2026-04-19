@@ -6,7 +6,7 @@ Required scopes (application permissions):
 
 - `Calendars.Read` — read room mailbox calendars.
 - `OnlineMeetings.Read.All` — look up meeting metadata.
-- (Subscription phase) a scope compatible with the `/communications/onlineMeetings` change-notification resource used for Jabra join events.
+- (Subscription phase) a scope compatible with the `/communications/onlineMeetings` change-notification resource used for join events.
 
 After creating the app:
 
@@ -17,7 +17,7 @@ After creating the app:
 ## Running the add-on locally
 
 ```bash
-cd addon/jabra_events
+cd addon/teams_events
 python -m venv .venv && source .venv/bin/activate
 pip install -e ./app
 cp options.example.json options.json   # (create this once we have a template)
@@ -26,7 +26,7 @@ python -m app.main
 
 ## Relay
 
-Outputs from `cdk deploy JabraEventsRelay`:
+Outputs from `cdk deploy TeamsEventsRelay`:
 
 - `WebhookUrl` → use as Graph subscription `notificationUrl`.
 - `WebSocketUrl` → set as add-on `relay_ws_url`.

@@ -6,7 +6,7 @@ from typing import Iterable
 
 import boto3
 
-CONNECTIONS_TABLE = os.environ.get("CONNECTIONS_TABLE", "jabra-relay-connections")
+CONNECTIONS_TABLE = os.environ.get("CONNECTIONS_TABLE", "teams-relay-connections")
 
 _ddb = boto3.resource("dynamodb")
 _table = _ddb.Table(CONNECTIONS_TABLE)

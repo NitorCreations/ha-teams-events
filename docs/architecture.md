@@ -3,12 +3,12 @@
 High-level flow (see `homeassistant-configuration/TEAMS_EVENTS.md` for the full design):
 
 ```
-Jabra room terminal → Microsoft Graph → AWS relay (HTTP API) → WebSocket → HA add-on → room_modes.run_mode
+Teams room device (e.g. Jabra terminal) → Microsoft Graph → AWS relay (HTTP API) → WebSocket → HA add-on → room_modes.run_mode
 ```
 
 Responsibilities:
 
-- **Add-on (`addon/jabra_events/`)** — polls room calendars, creates/renews Graph subscriptions for meeting call events, keeps a persistent WebSocket to the relay, matches incoming notifications back to room/mode, and calls `room_modes.run_mode`.
+- **Add-on (`addon/teams_events/`)** — polls room calendars, creates/renews Graph subscriptions for meeting call events, keeps a persistent WebSocket to the relay, matches incoming notifications back to room/mode, and calls `room_modes.run_mode`.
 - **Relay (`relay/lambda/`)** — transport-only. Accepts Graph webhooks and the Graph validation challenge, then fans out raw payloads to every connected add-on through the WebSocket management API. No room awareness.
 - **Infra (`infra/cdk/`)** — deploys the relay: REST API + WebSocket API + four Lambda handlers + DynamoDB `Connections` table + shared-secret in Secrets Manager. Region: `eu-west-1`.
 

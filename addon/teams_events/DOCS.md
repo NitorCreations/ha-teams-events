@@ -1,6 +1,6 @@
-# Jabra Events
+# Teams Events
 
-Home Assistant add-on that triggers `room_modes.run_mode` when a Jabra room terminal joins a Microsoft Teams meeting.
+Home Assistant add-on that triggers `room_modes.run_mode` from Microsoft Teams meeting events (for example, when a room device joins the meeting).
 
 ## Configuration
 

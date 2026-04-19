@@ -19,5 +19,5 @@ infra/cdk/.cdk.staging/
 .DS_Store
 
 # Local dev options for the add-on
-addon/jabra_events/options.json
-addon/jabra_events/.data/
+addon/teams_events/options.json
+addon/teams_events/.data/
