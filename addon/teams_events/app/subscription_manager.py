@@ -10,7 +10,7 @@ from urllib.parse import quote
 from dateutil import parser as dtparse
 
 from .cert_store import NotificationCert
-from .graph_client import GraphAuthError, GraphClient
+from .graph_client import GRAPH_BETA, GraphAuthError, GraphClient
 from .health import Health
 from .models import MeetingWatch, RoomConfig, SubscriptionRecord
 from .subscription_store import SubscriptionStore
@@ -111,7 +111,9 @@ class SubscriptionManager:
             records = self._store.all()
         for record in records:
             try:
-                await self._graph.delete(f"/subscriptions/{record.subscription_id}")
+                await self._graph.delete(
+                    f"/subscriptions/{record.subscription_id}", base_url=GRAPH_BETA
+                )
             except GraphAuthError as exc:
                 log.warning("Cleanup delete failed for %s: %s", record.subscription_id, exc)
             async with self._lock:
@@ -139,7 +141,7 @@ class SubscriptionManager:
             "encryptionCertificate": self._cert.public_cert_b64_der,
             "encryptionCertificateId": self._cert.cert_id,
         }
-        payload = await self._graph.post("/subscriptions", body)
+        payload = await self._graph.post("/subscriptions", body, base_url=GRAPH_BETA)
         subscription_id = payload["id"]
         record = SubscriptionRecord(
             subscription_id=subscription_id,
@@ -165,6 +167,7 @@ class SubscriptionManager:
         payload = await self._graph.patch(
             f"/subscriptions/{record.subscription_id}",
             {"expirationDateTime": _graph_timestamp(expires)},
+            base_url=GRAPH_BETA,
         )
         new_expiry = dtparse.isoparse(payload["expirationDateTime"])
         renewed = SubscriptionRecord(
@@ -185,7 +188,9 @@ class SubscriptionManager:
 
     async def _delete(self, record: SubscriptionRecord) -> None:
         try:
-            await self._graph.delete(f"/subscriptions/{record.subscription_id}")
+            await self._graph.delete(
+                f"/subscriptions/{record.subscription_id}", base_url=GRAPH_BETA
+            )
             log.info("Deleted subscription %s", record.subscription_id)
         except GraphAuthError as exc:
             log.warning(

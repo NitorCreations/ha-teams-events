@@ -8,7 +8,8 @@ import aiohttp
 
 log = logging.getLogger(__name__)
 
-GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+GRAPH_V1 = "https://graph.microsoft.com/v1.0"
+GRAPH_BETA = "https://graph.microsoft.com/beta"
 TOKEN_URL_TMPL = "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
 DEFAULT_SCOPE = "https://graph.microsoft.com/.default"
 
@@ -20,8 +21,9 @@ class GraphAuthError(RuntimeError):
 class GraphClient:
     """Microsoft Graph client using client-credentials flow.
 
-    Token acquisition is done via direct HTTP (keeps the dependency surface
-    small). Swap to `msal` later if we need caching or certificate auth.
+    Defaults to the `/v1.0` endpoint. Individual calls can pass
+    `base_url=GRAPH_BETA` to target the beta surface — required for some
+    Teams features (e.g. meetingCallEvents subscriptions as of 2026-04).
     """
 
     def __init__(
@@ -30,11 +32,13 @@ class GraphClient:
         client_id: str,
         client_secret: str,
         session: aiohttp.ClientSession,
+        base_url: str = GRAPH_V1,
     ) -> None:
         self._tenant_id = tenant_id
         self._client_id = client_id
         self._client_secret = client_secret
         self._session = session
+        self._base_url = base_url
         self._token: str | None = None
         self._token_expires_at: float = 0.0
 
@@ -53,7 +57,6 @@ class GraphClient:
             if resp.status != 200:
                 raise GraphAuthError(f"Token request failed: {payload}")
             self._token = payload["access_token"]
-            # Refresh ~60s before expiry.
             self._token_expires_at = time.time() + int(payload.get("expires_in", 3600)) - 60
             log.info("Acquired Graph token, valid for %ss", payload.get("expires_in"))
 
@@ -62,37 +65,78 @@ class GraphClient:
             await self._fetch_token()
         return {"Authorization": f"Bearer {self._token}"}
 
-    async def get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _url(self, path: str, base_url: str | None) -> str:
+        base = base_url or self._base_url
+        return f"{base}{path}"
+
+    async def _error_body(self, resp: aiohttp.ClientResponse) -> str:
+        """Read a 4xx/5xx response body as text regardless of content-length
+        header (Graph sometimes uses chunked encoding, so the Content-Length-
+        based guard we used to have swallowed the error payload).
+        """
+        try:
+            return (await resp.text())[:800]
+        except Exception:
+            return "<unreadable body>"
+
+    async def get(
+        self,
+        path: str,
+        params: dict[str, Any] | None = None,
+        base_url: str | None = None,
+    ) -> dict[str, Any]:
         headers = await self._auth_header()
-        url = f"{GRAPH_BASE}{path}"
-        async with self._session.get(url, headers=headers, params=params) as resp:
-            payload = await resp.json()
+        async with self._session.get(
+            self._url(path, base_url), headers=headers, params=params
+        ) as resp:
             if resp.status >= 400:
-                raise GraphAuthError(f"GET {path} failed ({resp.status}): {payload}")
-            return payload
+                raise GraphAuthError(
+                    f"GET {path} failed ({resp.status}): {await self._error_body(resp)}"
+                )
+            return await resp.json()
 
-    async def post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
+    async def post(
+        self,
+        path: str,
+        body: dict[str, Any],
+        base_url: str | None = None,
+    ) -> dict[str, Any]:
         headers = {**await self._auth_header(), "Content-Type": "application/json"}
-        url = f"{GRAPH_BASE}{path}"
-        async with self._session.post(url, headers=headers, json=body) as resp:
-            payload = await resp.json() if resp.content_length else {}
+        async with self._session.post(
+            self._url(path, base_url), headers=headers, json=body
+        ) as resp:
             if resp.status >= 400:
-                raise GraphAuthError(f"POST {path} failed ({resp.status}): {payload}")
-            return payload
+                raise GraphAuthError(
+                    f"POST {path} failed ({resp.status}): {await self._error_body(resp)}"
+                )
+            if resp.status == 204:
+                return {}
+            return await resp.json()
 
-    async def patch(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
+    async def patch(
+        self,
+        path: str,
+        body: dict[str, Any],
+        base_url: str | None = None,
+    ) -> dict[str, Any]:
         headers = {**await self._auth_header(), "Content-Type": "application/json"}
-        url = f"{GRAPH_BASE}{path}"
-        async with self._session.patch(url, headers=headers, json=body) as resp:
-            payload = await resp.json() if resp.content_length else {}
+        async with self._session.patch(
+            self._url(path, base_url), headers=headers, json=body
+        ) as resp:
             if resp.status >= 400:
-                raise GraphAuthError(f"PATCH {path} failed ({resp.status}): {payload}")
-            return payload
+                raise GraphAuthError(
+                    f"PATCH {path} failed ({resp.status}): {await self._error_body(resp)}"
+                )
+            if resp.status == 204:
+                return {}
+            return await resp.json()
 
-    async def delete(self, path: str) -> None:
+    async def delete(self, path: str, base_url: str | None = None) -> None:
         headers = await self._auth_header()
-        url = f"{GRAPH_BASE}{path}"
-        async with self._session.delete(url, headers=headers) as resp:
+        async with self._session.delete(
+            self._url(path, base_url), headers=headers
+        ) as resp:
             if resp.status >= 400 and resp.status != 404:
-                text = await resp.text()
-                raise GraphAuthError(f"DELETE {path} failed ({resp.status}): {text}")
+                raise GraphAuthError(
+                    f"DELETE {path} failed ({resp.status}): {await self._error_body(resp)}"
+                )
