@@ -40,4 +40,6 @@ class HAClient:
             return await resp.json()
 
     async def run_room_mode(self, mode_id: str) -> None:
-        await self.call_service("room_modes", "run_mode", {"mode_id": mode_id})
+        # ha-room-modes' run_mode service expects `mode` (the mode id string),
+        # not `mode_id`. See ha-room-modes/custom_components/room_modes/services.yaml.
+        await self.call_service("room_modes", "run_mode", {"mode": mode_id})
