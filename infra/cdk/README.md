@@ -8,14 +8,14 @@ Deploys:
 - DynamoDB table `Connections` (keyed by `site_id` + `connection_id`).
 - Secrets Manager secret holding the shared relay token.
 
-Deploys are **run locally** against the `nitor-infra` AWS account — the relay changes very rarely so a GitHub Actions pipeline is not worth the OIDC setup.
+Deploys are **run locally**. The relay changes very rarely so a GitHub Actions pipeline is not worth the OIDC setup.
 
 ## Prerequisites
 
-- AWS credentials for the `nitor-infra` account (e.g. via `nep nitor-infra`).
-- Region: `eu-west-1`.
+- AWS credentials for your chosen account with permission to create the resources above (simplest: AdministratorAccess on the account during initial bootstrap, scoped down afterwards).
+- A region you want the relay deployed in — the stack honours `CDK_DEFAULT_REGION` (default `eu-west-1`).
 - Python 3.12+ (the `aws-cdk-lib` wheels ship up to 3.13).
-- Node 18+ (for the `cdk` CLI — either `npx cdk` or a global `npm install -g aws-cdk@2`).
+- Node 18+ for the `cdk` CLI — either `npx cdk` or a global `npm install -g aws-cdk@2`.
 
 ```bash
 cd infra/cdk
@@ -26,14 +26,14 @@ pip install -r requirements.txt
 ## Bootstrap (once per account/region)
 
 ```bash
-nep nitor-infra
+# Assume/export AWS credentials however you normally do (AWS_PROFILE, AWS SSO,
+# aws-vault, nameless-deploy-tools, etc.)
 CDK_DEFAULT_REGION=eu-west-1 npx cdk bootstrap aws://<account-id>/eu-west-1
 ```
 
 ## Diff / deploy
 
 ```bash
-nep nitor-infra
 CDK_DEFAULT_REGION=eu-west-1 npx cdk diff TeamsEventsRelay
 CDK_DEFAULT_REGION=eu-west-1 npx cdk deploy TeamsEventsRelay --outputs-file cdk-outputs.json
 ```
@@ -46,12 +46,11 @@ Outputs (also written to `cdk-outputs.json`):
   ```bash
   aws secretsmanager get-secret-value --secret-id <arn> --query SecretString --output text
   ```
-- `ConnectionsTableName` — for local DynamoDB inspection / ops.
+- `ConnectionsTableName` — for ops/debug visibility into who's connected.
 
 ## Tearing down
 
 ```bash
-nep nitor-infra
 CDK_DEFAULT_REGION=eu-west-1 npx cdk destroy TeamsEventsRelay
 ```
 
@@ -61,3 +60,4 @@ The DynamoDB table and Secrets Manager secret are created with `RETAIN`, so they
 
 - The Lambda code under `relay/lambda/` is bundled directly (no build step). The CDK stack reads it via `Code.from_asset`, so deploys pick up local edits.
 - The shared secret is resolved into each Lambda's environment at synth time via `Secret.secret_value.unsafe_unwrap()`. Rotating the secret requires re-deploying the stack.
+- The relay is completely transport-only. Running multiple HA add-on instances against one relay is fine — each instance identifies itself with a distinct `site_id` in its `hello` frame, and the DynamoDB `Connections` table can hold them all.

@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "lovelace.dashboard_teams_events",
+  "data": {
+    "config": {
+      "views": [
+        {
+          "title": "Teams Events",
+          "path": "home",
+          "icon": "mdi:microsoft-teams",
+          "type": "sections",
+          "max_columns": 3,
+          "sections": [
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Pipeline health",
+                  "heading_style": "title"
+                },
+                {
+                  "type": "tile",
+                  "entity": "binary_sensor.teams_events_armed",
+                  "name": "Armed (trigger_modes)"
+                },
+                {
+                  "type": "tile",
+                  "entity": "binary_sensor.teams_events_relay_connected",
+                  "name": "Relay"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.teams_events_active_subscriptions",
+                  "name": "Active subscriptions"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.teams_events_next_subscription_renewal",
+                  "name": "Next renewal"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "heading",
+                  "heading": "Recent activity",
+                  "heading_style": "title"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.teams_events_last_graph_auth",
+                  "name": "Last Graph auth"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.teams_events_last_calendar_poll",
+                  "name": "Last calendar poll"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.teams_events_last_forwarded_event",
+                  "name": "Last Teams event"
+                },
+                {
+                  "type": "tile",
+                  "entity": "sensor.teams_events_last_triggered_mode",
+                  "name": "Last triggered mode"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -31,12 +31,9 @@ options:
   trigger_modes: true
   log_level: "INFO"
   rooms:
-    - room_id: "kohonen"
-      account_email: "room-kohonen@nitor.com"
-      mode_id: "kohonen_jabra_teams"
-    - room_id: "lovelace"
-      account_email: "room-lovelace@nitor.com"
-      mode_id: "lovelace_jabra_teams"
+    - room_id: "example_room"
+      account_email: "room-example@example.com"
+      mode_id: "example_room_jabra_teams"
 schema:
   tenant_id: str
   client_id: str
