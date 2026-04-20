@@ -116,7 +116,9 @@ async def _amain() -> None:
             health=health,
         )
 
-        publisher = HealthPublisher(ha=ha, health=health)
+        publisher = HealthPublisher(
+            ha=ha, health=health, trigger_modes=config.trigger_modes
+        )
 
         tasks = [
             asyncio.create_task(relay.run(), name="relay-ws"),

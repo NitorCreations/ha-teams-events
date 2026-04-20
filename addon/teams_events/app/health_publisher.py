@@ -22,6 +22,7 @@ class HealthPublisher:
     `last_update_at` on each state tells the user when the value was fresh.
     """
 
+    ENTITY_ARMED = "binary_sensor.teams_events_armed"
     ENTITY_RELAY_CONNECTED = "binary_sensor.teams_events_relay_connected"
     ENTITY_ACTIVE_SUBS = "sensor.teams_events_active_subscriptions"
     ENTITY_NEXT_RENEWAL = "sensor.teams_events_next_subscription_renewal"
@@ -34,10 +35,12 @@ class HealthPublisher:
         self,
         ha: HAClient,
         health: Health,
+        trigger_modes: bool,
         interval_seconds: int = 30,
     ) -> None:
         self._ha = ha
         self._health = health
+        self._trigger_modes = trigger_modes
         self._interval = interval_seconds
 
     async def run(self) -> None:
@@ -50,6 +53,16 @@ class HealthPublisher:
 
     async def _publish_once(self) -> None:
         snap = self._health.snapshot()
+
+        await self._set(
+            self.ENTITY_ARMED,
+            "on" if self._trigger_modes else "off",
+            {
+                "friendly_name": "Teams Events armed",
+                "icon": "mdi:lightning-bolt" if self._trigger_modes else "mdi:lightning-bolt-outline",
+                "device_class": "running",
+            },
+        )
 
         await self._set(
             self.ENTITY_RELAY_CONNECTED,

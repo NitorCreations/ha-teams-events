@@ -108,14 +108,21 @@ class EventRouter:
             record.room.mode_id,
             record.meeting_id,
         )
+        # Record the match regardless of whether we're armed, so dev
+        # instances (trigger_modes=false) still expose `last_triggered_mode`
+        # and `last_triggered_at` for observability.
+        self._health.update(
+            last_triggered_mode=record.room.mode_id,
+            last_triggered_at=time.time(),
+        )
         if not self._trigger_modes:
+            log.info(
+                "trigger_modes=false — skipping room_modes.run_mode for %s",
+                record.room.mode_id,
+            )
             return
         try:
             await self._ha.run_room_mode(record.room.mode_id)
-            self._health.update(
-                last_triggered_mode=record.room.mode_id,
-                last_triggered_at=time.time(),
-            )
         except Exception as exc:  # pragma: no cover
             log.exception("run_room_mode failed: %s", exc)
 
