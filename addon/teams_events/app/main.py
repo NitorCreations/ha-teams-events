@@ -15,6 +15,7 @@ from .event_router import EventRouter
 from .graph_client import GraphClient
 from .ha_client import HAClient
 from .health import Health
+from .health_publisher import HealthPublisher
 from .relay_ws_client import RelayWSClient
 from .subscription_manager import SubscriptionManager
 from .subscription_store import SubscriptionStore
@@ -111,7 +112,12 @@ async def _amain() -> None:
             health=health,
         )
 
-        tasks = [asyncio.create_task(relay.run(), name="relay-ws")]
+        publisher = HealthPublisher(ha=ha, health=health)
+
+        tasks = [
+            asyncio.create_task(relay.run(), name="relay-ws"),
+            asyncio.create_task(publisher.run(), name="health-publisher"),
+        ]
         if graph_credentials_ok:
             tasks.append(asyncio.create_task(watcher.run(), name="calendar-watcher"))
         else:

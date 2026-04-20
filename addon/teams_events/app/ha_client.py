@@ -43,3 +43,11 @@ class HAClient:
         # ha-room-modes' run_mode service expects `mode` (the mode id string),
         # not `mode_id`. See ha-room-modes/custom_components/room_modes/services.yaml.
         await self.call_service("room_modes", "run_mode", {"mode": mode_id})
+
+    async def set_state(
+        self, entity_id: str, state: Any, attributes: dict[str, Any] | None = None
+    ) -> None:
+        url = f"{self._base_url}/api/states/{entity_id}"
+        body = {"state": str(state), "attributes": attributes or {}}
+        async with self._session.post(url, headers=self._headers, json=body) as resp:
+            resp.raise_for_status()
