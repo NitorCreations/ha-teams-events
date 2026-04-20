@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import aiohttp
+
+if TYPE_CHECKING:
+    from .health import Health
 
 log = logging.getLogger(__name__)
 
@@ -33,12 +36,14 @@ class GraphClient:
         client_secret: str,
         session: aiohttp.ClientSession,
         base_url: str = GRAPH_V1,
+        health: "Health | None" = None,
     ) -> None:
         self._tenant_id = tenant_id
         self._client_id = client_id
         self._client_secret = client_secret
         self._session = session
         self._base_url = base_url
+        self._health = health
         self._token: str | None = None
         self._token_expires_at: float = 0.0
 
@@ -59,6 +64,8 @@ class GraphClient:
             self._token = payload["access_token"]
             self._token_expires_at = time.time() + int(payload.get("expires_in", 3600)) - 60
             log.info("Acquired Graph token, valid for %ss", payload.get("expires_in"))
+            if self._health is not None:
+                self._health.update(last_graph_auth_ok=time.time())
 
     async def _auth_header(self) -> dict[str, str]:
         if self._token is None or time.time() >= self._token_expires_at:

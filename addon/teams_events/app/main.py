@@ -51,7 +51,11 @@ async def _amain() -> None:
         session = await stack.enter_async_context(aiohttp.ClientSession())
         ha = HAClient(config.ha_base_url, config.ha_token, session)
         graph = GraphClient(
-            config.tenant_id, config.client_id, config.client_secret, session
+            config.tenant_id,
+            config.client_id,
+            config.client_secret,
+            session,
+            health=health,
         )
         router = EventRouter(
             store=store,

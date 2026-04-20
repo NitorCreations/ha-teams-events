@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable, Iterable
 
@@ -40,7 +41,7 @@ class CalendarWatcher:
             try:
                 await self._poll_once()
                 self._health.update(
-                    last_calendar_poll_ok=asyncio.get_event_loop().time(),
+                    last_calendar_poll_ok=time.time(),
                     last_calendar_poll_error=None,
                 )
             except Exception as exc:  # pragma: no cover - top-level safety net
